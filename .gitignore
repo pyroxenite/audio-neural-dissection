@@ -1,0 +1,26 @@
+# Ignore python optimisation/cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+__pycache__/
+*.pyc
+Pipfile.lock
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+ipython_config.py
+profile_default/
+
+# VS Code setup
+.vscode/
+
+# Local dataset storage
+/code/data/
+
+# Local package installs
+/code/venv/
+
+# Misc.
+.DS_Store
