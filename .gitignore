@@ -20,7 +20,7 @@ profile_default/
 /code/data/
 
 # Local package installs
-/code/venv/
+/venv/
 
 # Misc.
 .DS_Store
