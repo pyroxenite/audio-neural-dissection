@@ -1,5 +1,10 @@
 torch
+torchaudio
 torchvision
 matplotlib
 numpy
 ipykernel
+scipy
+
+mypy
+nvitop
