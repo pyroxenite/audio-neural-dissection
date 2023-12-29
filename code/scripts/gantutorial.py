@@ -13,7 +13,7 @@ Tensor = torch.Tensor
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 BUFFER_SIZE = 30000
-BATCH_SIZE = 16
+BATCH_SIZE  = 16
 NUM_THREADS = 4
 
 global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
@@ -37,7 +37,7 @@ class DebugLayer(nn.Module):
     
 
     def print_dimensions(self, x: Tensor) -> Tensor:
-        print(f"Input dimensions : {x.size()}")
+        print(f"Tensor dimensions : {x.size()}")
 
     def forward(self, x: Tensor) -> Tensor:
         
@@ -60,15 +60,24 @@ class Generator(nn.Module):
             nn.LeakyReLU(),
 
             nn.Unflatten(1, (7, 7, 256)), 
+            DebugLayer(print_dims = True),
 
-            nn.ConvTranspose2d(4, 128, 5, bias=False),
+            nn.ConvTranspose2d(7, 128, 5, bias=False),
+            DebugLayer(print_dims = True),
             nn.BatchNorm2d(128), 
             nn.LeakyReLU(), 
 
-            nn.ConvTranspose2d(128, 1, 5, 2, bias=False),
+            nn.ConvTranspose2d(128, 64, 5, 2, bias=False),
+            DebugLayer(print_dims = True),
+            nn.BatchNorm2d(64), 
+            nn.LeakyReLU(), 
+
+            nn.ConvTranspose2d(64, 1, 5, 2, bias=False),
+            DebugLayer(print_dims = True),
             nn.Tanh(),
 
-            nn.Unflatten(1, (28, 28))
+            nn.Unflatten(1, torch.Size([28, 28, 1])),
+            DebugLayer(print_dims = True),
         )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -129,7 +138,7 @@ seed = torch.manual_seed(50)
 
 
 def test_generator() -> Tensor:
-    noise = torch.randn((generator.input_shape))
+    noise = torch.randn((BATCH_SIZE, generator.input_shape))
     output = generator(noise)
     return output
 
@@ -148,7 +157,7 @@ def train():
 
         for n, (real_samples, real_labels) in enumerate(train_loader):
             
-            noise = torch.randn((generator.input_shape,))
+            noise = torch.randn((BATCH_SIZE, generator.input_shape,))
 
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
