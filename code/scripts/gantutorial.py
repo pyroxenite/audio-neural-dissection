@@ -29,6 +29,7 @@ test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATC
 
 
 class DebugLayer(nn.Module):
+        
     def __init__(self, print_dims: bool = False, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
@@ -51,33 +52,34 @@ class Generator(nn.Module):
         super().__init__(*args, **kwargs)
 
         self.input_shape = 100
+        self.debug_print_dims: bool = True
 
         self.model = nn.Sequential(
 
             nn.Linear(self.input_shape, 7*7*256, bias=False), 
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
             nn.BatchNorm1d(7*7*256),
             nn.LeakyReLU(),
 
             nn.Unflatten(1, (7, 7, 256)), 
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
 
             nn.ConvTranspose2d(7, 128, 5, bias=False),
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
             nn.BatchNorm2d(128), 
             nn.LeakyReLU(), 
 
             nn.ConvTranspose2d(128, 64, 5, 2, bias=False),
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
             nn.BatchNorm2d(64), 
             nn.LeakyReLU(), 
 
             nn.ConvTranspose2d(64, 1, 5, 2, bias=False),
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
             nn.Tanh(),
 
             nn.Unflatten(1, torch.Size([28, 28, 1])),
-            DebugLayer(print_dims = True),
+            DebugLayer(print_dims = self.debug_print_dims),
         )
 
     def forward(self, x: Tensor) -> Tensor:
