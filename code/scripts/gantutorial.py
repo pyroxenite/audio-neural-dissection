@@ -29,7 +29,6 @@ test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATC
 
 
 class DebugLayer(nn.Module):
-        
     def __init__(self, print_dims: bool = False, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
@@ -40,10 +39,22 @@ class DebugLayer(nn.Module):
     def print_dimensions(self, x: Tensor) -> Tensor:
         print(f"Tensor dimensions : {x.size()}")
 
+
     def forward(self, x: Tensor) -> Tensor:
         
         if self.print_dims: self.print_dimensions(x)
 
+        return x
+
+
+class ReshapeLayer(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.shape = args    
+
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = torch.reshape(x, self.shape)
         return x
 
 
@@ -55,7 +66,6 @@ class Generator(nn.Module):
         self.debug_print_dims: bool = True
 
         self.model = nn.Sequential(
-
             nn.Linear(self.input_shape, 7*7*256, bias=False), 
             DebugLayer(print_dims = self.debug_print_dims),
             nn.BatchNorm1d(7*7*256),
