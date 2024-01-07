@@ -60,40 +60,44 @@ class ReshapeLayer(nn.Module):
 
 class Generator(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super(Generator, self).__init__(*args, **kwargs)
 
         self.input_shape = 100
         self.debug_print_dims: bool = True
 
-        self.model = nn.Sequential(
-            nn.Linear(self.input_shape, 7*7*256, bias=False), 
-            DebugLayer(print_dims = self.debug_print_dims),
-            nn.BatchNorm1d(7*7*256),
-            nn.LeakyReLU(),
 
-            nn.Unflatten(1, (7, 7, 256)), 
-            DebugLayer(print_dims = self.debug_print_dims),
+        self.linear1 = nn.Linear(self.input_shape, 7*7*256, bias=False) 
+        self.norm1 = nn.BatchNorm2d(256)
+        self.act1 = nn.LeakyReLU()
 
-            nn.ConvTranspose2d(7, 128, 5, bias=False),
-            DebugLayer(print_dims = self.debug_print_dims),
-            nn.BatchNorm2d(128), 
-            nn.LeakyReLU(), 
+        self.conv1 = nn.ConvTranspose2d(256, 128, kernel_size=5, padding=2, bias=False)
+        self.norm2 = nn.BatchNorm2d(128)
+        self.act2 = nn.LeakyReLU()
 
-            nn.ConvTranspose2d(128, 64, 5, 2, bias=False),
-            DebugLayer(print_dims = self.debug_print_dims),
-            nn.BatchNorm2d(64), 
-            nn.LeakyReLU(), 
+        self.conv2 = nn.ConvTranspose2d(128, 64, kernel_size=5, stride=2, padding=2, bias=False)
+        self.norm3 = nn.BatchNorm2d(64) 
+        self.act3 = nn.LeakyReLU() 
 
-            nn.ConvTranspose2d(64, 1, 5, 2, bias=False),
-            DebugLayer(print_dims = self.debug_print_dims),
-            nn.Tanh(),
-
-            nn.Unflatten(1, torch.Size([28, 28, 1])),
-            DebugLayer(print_dims = self.debug_print_dims),
-        )
+        self.conv3 = nn.ConvTranspose2d(64, 1, kernel_size=5, stride=2, bias=False)
+        self.act4 = nn.Tanh()
 
     def forward(self, x: Tensor) -> Tensor:
-        output = self.model(x)  
+
+        x = self.linear1(x)
+        x = self.norm1(x)
+        x = self.act1(x)
+
+        x = self.conv1(x)
+        x = self.norm2(x)
+        x = self.act2(x)
+
+        x = self.conv2(x)
+        x = self.norm3(x)
+        x = self.act3(x)
+
+        x = self.conv3(x)
+        x = self.act4(x)
+
         output = output.view(x.size(0), 1, 28, 28)
         return output 
 
@@ -102,24 +106,34 @@ class Discriminator(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.model = nn.Sequential(
-            nn.Conv2d(1, 64, (5, 5), 2, bias=False),
-            nn.LeakyReLU(), 
-            nn.Dropout(0.3),
+        self.conv1 = nn.Conv2d(1, 64, (5, 5), 2, bias=False)
+        self.act1 = nn.LeakyReLU() 
+        self.drop1 = nn.Dropout(0.3)
 
-            nn.Conv2d(64, 1, (5, 5), 2, bias=False), 
-            nn.LeakyReLU(), 
-            nn.Dropout(0.3),
+        self.conv2 = nn.Conv2d(64, 1, (5, 5), 2, bias=False) 
+        self.act2 = nn.LeakyReLU() 
+        self.drop2 = nn.Dropout(0.3)
 
-            nn.Flatten(), 
-            nn.Linear(784, 10, bias=False), 
-            nn.Softmax(dim=0)       
-        )
+        self.flat1 = nn.Flatten()
+        self.linear1 = nn.Linear(784, 10, bias=False)
+        self.softmax = nn.Softmax(dim=0)       
 
     def forward(self, x: Tensor) -> Tensor:
         x = x.view(-1, 28*28)
-        return self.model(x)
-    
+
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.drop1(x)
+
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.drop2(x)
+       
+        x = self.flat1(x)
+        x = self.linear1(x)
+        x = self.softmax(x)
+
+        return x
 
 generator = Generator()
 discriminator = Discriminator()
