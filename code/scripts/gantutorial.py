@@ -67,18 +67,18 @@ class Generator(nn.Module):
 
 
         self.linear1 = nn.Linear(self.input_shape, 7*7*256, bias=False) 
-        self.norm1 = nn.BatchNorm2d(256)
+        self.norm1 = nn.BatchNorm1d(7*7*256)
         self.act1 = nn.LeakyReLU()
 
-        self.conv1 = nn.ConvTranspose2d(256, 128, kernel_size=5, padding=2, bias=False)
+        self.conv1 = nn.ConvTranspose2d(256, 128, kernel_size=5, stride=1, padding=2, bias=False)
         self.norm2 = nn.BatchNorm2d(128)
         self.act2 = nn.LeakyReLU()
 
-        self.conv2 = nn.ConvTranspose2d(128, 64, kernel_size=5, stride=2, padding=2, bias=False)
+        self.conv2 = nn.ConvTranspose2d(128, 64, kernel_size=5, stride=2, padding=2, output_padding=1, bias=False)
         self.norm3 = nn.BatchNorm2d(64) 
         self.act3 = nn.LeakyReLU() 
 
-        self.conv3 = nn.ConvTranspose2d(64, 1, kernel_size=5, stride=2, bias=False)
+        self.conv3 = nn.ConvTranspose2d(64, 1, kernel_size=5, stride=2, padding=2, output_padding=1, bias=False)
         self.act4 = nn.Tanh()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -87,6 +87,7 @@ class Generator(nn.Module):
         x = self.norm1(x)
         x = self.act1(x)
 
+        x = torch.reshape(x, (16, 256, 7, 7))
         x = self.conv1(x)
         x = self.norm2(x)
         x = self.act2(x)
@@ -98,28 +99,31 @@ class Generator(nn.Module):
         x = self.conv3(x)
         x = self.act4(x)
 
-        output = output.view(x.size(0), 1, 28, 28)
-        return output 
+
+        return x
 
 
 class Discriminator(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.conv1 = nn.Conv2d(1, 64, (5, 5), 2, bias=False)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2, bias=False)
         self.act1 = nn.LeakyReLU() 
         self.drop1 = nn.Dropout(0.3)
 
-        self.conv2 = nn.Conv2d(64, 1, (5, 5), 2, bias=False) 
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, bias=False) 
         self.act2 = nn.LeakyReLU() 
         self.drop2 = nn.Dropout(0.3)
 
         self.flat1 = nn.Flatten()
-        self.linear1 = nn.Linear(784, 10, bias=False)
+        self.linear1 = nn.Linear(2048, 128, bias=False)
+        self.act3 = nn.LeakyReLU()
+
+        self.linear2 = nn.Linear(128, 10, bias=False)
         self.softmax = nn.Softmax(dim=0)       
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x.view(-1, 28*28)
+        x = x.view(BATCH_SIZE, 1, 28, 28)
 
         x = self.conv1(x)
         x = self.act1(x)
@@ -131,6 +135,9 @@ class Discriminator(nn.Module):
        
         x = self.flat1(x)
         x = self.linear1(x)
+        x = self.act3(x)
+
+        x = self.linear2(x)
         x = self.softmax(x)
 
         return x
@@ -142,7 +149,7 @@ loss_function = nn.CrossEntropyLoss()
 
 def discriminator_loss(real_output: Tensor, fake_output: Tensor) -> Tensor:
     real_loss = loss_function(torch.ones_like(real_output), real_output)
-    fake_loss = loss_function(torch.zeors_like(fake_output), fake_output)
+    fake_loss = loss_function(torch.zeros_like(fake_output), fake_output)
     return real_loss + fake_loss
 
 def generator_loss(fake_output: Tensor) -> Tensor:
@@ -170,7 +177,7 @@ def test_generator() -> Tensor:
 
 
 def test_discriminator() -> Tensor:
-    input_image = torch.randn((28, 28))
+    input_image = torch.randn((BATCH_SIZE, 28, 28))
     output = discriminator(input_image)
     return output
 
@@ -197,16 +204,18 @@ def train():
             disc_loss = discriminator_loss(real_output, fake_output)
 
 
-            gen_loss.backward()
+            gen_loss.backward(retain_graph=True)
             disc_loss.backward()
 
             generator_optimizer.step()
             discriminator_optimizer.step()
 
+            if n%100 == 0: print(f"batch n° {n}")
+
     print("\nDone Training\n")
 
 
 if __name__ == "__main__":
-    # train()
-    result = test_generator()
+    train()
+    # result = test_generator()
     # result = test_discriminator()
