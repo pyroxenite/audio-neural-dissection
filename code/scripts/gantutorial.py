@@ -142,55 +142,44 @@ class Discriminator(nn.Module):
 
         return x
 
-generator = Generator()
-discriminator = Discriminator()
-
-loss_function = nn.CrossEntropyLoss()
-
-def discriminator_loss(real_output: Tensor, fake_output: Tensor) -> Tensor:
+def discriminator_loss(real_output: Tensor, fake_output: Tensor, loss_function) -> Tensor:
     real_loss = loss_function(torch.ones_like(real_output), real_output)
     fake_loss = loss_function(torch.zeros_like(fake_output), fake_output)
     return real_loss + fake_loss
 
-def generator_loss(fake_output: Tensor) -> Tensor:
+def generator_loss(fake_output: Tensor, loss_function) -> Tensor:
     return loss_function(torch.ones_like(fake_output), fake_output)
 
 
-generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0001)
-discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
 
 
-# Boucle d'entrainement 
-
-do_train = True
-nEpochs = 5
-noise_dim = 100
-num_examples_to_generate = 16
-
-seed = torch.manual_seed(50)
-
-
-def test_generator() -> Tensor:
-    noise = torch.randn((BATCH_SIZE, generator.input_shape))
-    output = generator(noise)
+def test_generator(model) -> Tensor:
+    noise = torch.randn((BATCH_SIZE, model.input_shape))
+    output = model(noise)
     return output
 
 
-def test_discriminator() -> Tensor:
+def test_discriminator(model) -> Tensor:
     input_image = torch.randn((BATCH_SIZE, 28, 28))
-    output = discriminator(input_image)
+    output = model(input_image)
     return output
 
-def train():
+def train(generator, discriminator):
     
-    print("Start Training\n")
+    loss_function = nn.CrossEntropyLoss()
+
+    generator = generator.to(device)
+    discriminator = discriminator.to(device)
+
+    # comment pour testet
 
     for epoch in tqdm(range(nEpochs)):
         if not do_train: return -1
 
         for n, (real_samples, real_labels) in enumerate(train_loader):
             
-            noise = torch.randn((BATCH_SIZE, generator.input_shape,))
+            noise = torch.randn((BATCH_SIZE, generator.input_shape,)).to(device)
+            real_samples = real_samples.to(device)
 
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
@@ -200,9 +189,8 @@ def train():
             real_output = discriminator(real_samples)
             fake_output = discriminator(generated_images)
 
-            gen_loss = generator_loss(fake_output)
-            disc_loss = discriminator_loss(real_output, fake_output)
-
+            gen_loss = generator_loss(fake_output, loss_function)
+            disc_loss = discriminator_loss(real_output, fake_output, loss_function)
 
             gen_loss.backward(retain_graph=True)
             disc_loss.backward()
@@ -216,6 +204,23 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
-    # result = test_generator()
-    # result = test_discriminator()
+
+    print("Start Training\n")
+
+    generator = Generator()
+    discriminator = Discriminator()
+
+
+    generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0001)
+    discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
+
+    do_train = True
+    nEpochs = 5
+    noise_dim = 100
+    num_examples_to_generate = 16
+
+    seed = torch.manual_seed(50)
+
+    train(generator, discriminator)
+    # result = test_generator(generator)
+    # result = test_discriminator(discriminator)
