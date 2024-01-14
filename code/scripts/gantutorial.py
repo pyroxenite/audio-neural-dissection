@@ -27,7 +27,6 @@ train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_datas
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
 test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
 
-
 class DebugLayer(nn.Module):
     def __init__(self, print_dims: bool = False, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -35,10 +34,8 @@ class DebugLayer(nn.Module):
         self.print_dims = print_dims
         return
     
-
     def print_dimensions(self, x: Tensor) -> Tensor:
         print(f"Tensor dimensions : {x.size()}")
-
 
     def forward(self, x: Tensor) -> Tensor:
         
@@ -46,25 +43,22 @@ class DebugLayer(nn.Module):
 
         return x
 
-
 class ReshapeLayer(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.shape = args    
 
-
     def forward(self, x: Tensor) -> Tensor:
         x = torch.reshape(x, self.shape)
         return x
 
-
 class Generator(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, batch_size: int = 16, *args, **kwargs) -> None:
         super(Generator, self).__init__(*args, **kwargs)
 
         self.input_shape = 100
         self.debug_print_dims: bool = True
-
+        self.batch_size = batch_size
 
         self.linear1 = nn.Linear(self.input_shape, 7*7*256, bias=False) 
         self.norm1 = nn.BatchNorm1d(7*7*256)
@@ -87,7 +81,7 @@ class Generator(nn.Module):
         x = self.norm1(x)
         x = self.act1(x)
 
-        x = torch.reshape(x, (16, 256, 7, 7))
+        x = torch.reshape(x, (self.batch_size, 256, 7, 7))
         x = self.conv1(x)
         x = self.norm2(x)
         x = self.act2(x)
@@ -99,13 +93,13 @@ class Generator(nn.Module):
         x = self.conv3(x)
         x = self.act4(x)
 
-
         return x
 
-
 class Discriminator(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, batch_size: int = 16, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        
+        self.batch_size = batch_size
 
         self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2, bias=False)
         self.act1 = nn.LeakyReLU() 
@@ -116,14 +110,14 @@ class Discriminator(nn.Module):
         self.drop2 = nn.Dropout(0.3)
 
         self.flat1 = nn.Flatten()
-        self.linear1 = nn.Linear(2048, 128, bias=False)
+        self.linear1 = nn.Linear(self.batch_size*128, 128, bias=False)
         self.act3 = nn.LeakyReLU()
 
         self.linear2 = nn.Linear(128, 10, bias=False)
         self.softmax = nn.Softmax(dim=0)       
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x.view(BATCH_SIZE, 1, 28, 28)
+        x = x.view(self.batch_size, 1, 28, 28)
 
         x = self.conv1(x)
         x = self.act1(x)
@@ -150,21 +144,17 @@ def discriminator_loss(real_output: Tensor, fake_output: Tensor, loss_function) 
 def generator_loss(fake_output: Tensor, loss_function) -> Tensor:
     return loss_function(torch.ones_like(fake_output), fake_output)
 
-
-
-
 def test_generator(model) -> Tensor:
     noise = torch.randn((BATCH_SIZE, model.input_shape))
     output = model(noise)
     return output
-
 
 def test_discriminator(model) -> Tensor:
     input_image = torch.randn((BATCH_SIZE, 28, 28))
     output = model(input_image)
     return output
 
-def train(generator, discriminator):
+def train(generator, discriminator, n_epochs):
     
     loss_function = nn.CrossEntropyLoss()
 
@@ -173,7 +163,7 @@ def train(generator, discriminator):
 
     # comment pour testet
 
-    for epoch in tqdm(range(nEpochs)):
+    for epoch in tqdm(range(n_epochs)):
         if not do_train: return -1
 
         for n, (real_samples, real_labels) in enumerate(train_loader):
@@ -215,12 +205,12 @@ if __name__ == "__main__":
     discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
 
     do_train = True
-    nEpochs = 5
+    n_epochs = 5
     noise_dim = 100
     num_examples_to_generate = 16
 
     seed = torch.manual_seed(50)
 
-    train(generator, discriminator)
+    train(generator, discriminator, n_epochs)
     # result = test_generator(generator)
     # result = test_discriminator(discriminator)
