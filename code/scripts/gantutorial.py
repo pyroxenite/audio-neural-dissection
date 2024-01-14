@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import os
 from os.path import isdir, isfile
 from tqdm import tqdm
+import numpy as np 
+from numpy.typing import NDArray
 
 Tensor = torch.Tensor
 
@@ -65,6 +67,7 @@ class Generator(nn.Module):
         self.conv3 = nn.ConvTranspose2d(64, 1, kernel_size=5, stride=2, padding=2, output_padding=1, bias=False)
         self.act4 = nn.Tanh()
 
+
     def forward(self, x: Tensor) -> Tensor:
 
         x = self.linear1(x)
@@ -100,11 +103,12 @@ class Discriminator(nn.Module):
         self.drop2 = nn.Dropout(0.3)
 
         self.flat1 = nn.Flatten()
-        self.linear1 = nn.Linear(2048, 128, bias=False)
-        self.act3 = nn.LeakyReLU()
+        self.linear1 = nn.Linear(2048, 1, bias=False)
+        # self.act3 = nn.LeakyReLU()
 
-        self.linear2 = nn.Linear(128, 1, bias=False)
+        # self.linear2 = nn.Linear(128, 1, bias=False)
         self.softmax = nn.Softmax(dim=0)       
+
 
     def forward(self, x: Tensor) -> Tensor:
         x = x.view(BATCH_SIZE, 1, 28, 28)
@@ -119,22 +123,22 @@ class Discriminator(nn.Module):
        
         x = self.flat1(x)
         x = self.linear1(x)
-        x = self.act3(x)
+        # x = self.act3(x)
 
-        x = self.linear2(x)
+        # x = self.linear2(x)
         x = self.softmax(x)
 
         return x
+
 
 def discriminator_loss(real_output: Tensor, fake_output: Tensor, loss_function) -> Tensor:
     real_loss = loss_function(torch.ones_like(real_output), real_output)
     fake_loss = loss_function(torch.zeros_like(fake_output), fake_output)
     return real_loss + fake_loss
 
+
 def generator_loss(fake_output: Tensor, loss_function) -> Tensor:
     return loss_function(torch.ones_like(fake_output), fake_output)
-
-
 
 
 def test_generator(model) -> Tensor:
@@ -147,6 +151,7 @@ def test_discriminator(model) -> Tensor:
     input_image = torch.randn((BATCH_SIZE, 28, 28))
     output = model(input_image)
     return output
+
 
 def train(generator: Generator, discriminator: Discriminator, n_epochs: int) -> tuple[Tensor, Tensor]:
     
@@ -180,8 +185,8 @@ def train(generator: Generator, discriminator: Discriminator, n_epochs: int) -> 
             real_output = discriminator(real_samples)
             fake_output = discriminator(generated_images)
 
-            gen_loss = generator_loss(fake_output, loss_function)
-            disc_loss = discriminator_loss(real_output, fake_output, loss_function)
+            gen_loss = generator_loss(torch.flatten(fake_output), loss_function)
+            disc_loss = discriminator_loss(torch.flatten(real_output), torch.flatten(fake_output), loss_function)
 
             gen_loss.backward(retain_graph=True)
             disc_loss.backward()
@@ -190,15 +195,15 @@ def train(generator: Generator, discriminator: Discriminator, n_epochs: int) -> 
             discriminator_optimizer.step()
 
 
-            gen_epoch_loss += gen_loss
-            disc_epoch_loss += disc_loss
+            gen_epoch_loss += torch.sum(gen_loss)
+            disc_epoch_loss += torch.sum(disc_loss)
         
         print(f"gen_epoch_loss = {gen_epoch_loss}")
         print(f"disc_epoch_loss = {disc_epoch_loss}")
         gen_loss_array[epoch] = gen_epoch_loss
         disc_loss_array[epoch] = disc_epoch_loss
 
-        if epoch%10 == 0 and save_models:
+        if epoch % 10 == 0 and save_models:
 
             torch.save(generator.state_dict(), generator_file)
             torch.save(discriminator.state_dict(), discriminator_file)
@@ -218,7 +223,7 @@ if __name__ == "__main__":
 
 
     BUFFER_SIZE = 30000
-    BATCH_SIZE  = 24
+    BATCH_SIZE  = 16
     NUM_THREADS = 4
 
     global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
@@ -231,17 +236,14 @@ if __name__ == "__main__":
     train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_dataset, [nb_train, nb_valid])
 
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
-    test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
 
 
     generator_file = "code/models/mnist_gan_generator_benjamin.pt"
     discriminator_file = "code/models/mnist_gan_discriminator_benjamin.pt"
 
-    n_epochs = 10
+    n_epochs = 20
     print(f"n_epochs = {n_epochs}")
-
-    noise_dim = 100
-    num_examples_to_generate = 16
 
     generator = None
     discriminator = None
@@ -257,8 +259,8 @@ if __name__ == "__main__":
         discriminator = Discriminator()
 
 
-    generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0001)
-    discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
+    generator_optimizer = torch.optim.Adam(generator.parameters(), 0.001)
+    discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.001)
 
     seed = torch.manual_seed(50)
 
@@ -272,5 +274,7 @@ if __name__ == "__main__":
     torch.save(discriminator.state_dict(), discriminator_file)
 
     fig, ax = plt.subplots()
-    ax.plot(gen_loss)
-    ax.plt(disc_loss)
+    ax.plot(gen_loss.detach().numpy())
+    ax.plot(disc_loss.detach().numpy())
+
+    plt.show(block=True)
