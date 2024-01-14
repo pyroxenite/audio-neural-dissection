@@ -5,15 +5,14 @@ import torch.nn as nn
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt 
-import os
-from tqdm import tqdm
+import numpy as np
 
 Tensor = torch.Tensor
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 BUFFER_SIZE = 30000
-BATCH_SIZE  = 16
+BATCH_SIZE  = 256
 NUM_THREADS = 4
 
 global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
@@ -53,12 +52,11 @@ class ReshapeLayer(nn.Module):
         return x
 
 class Generator(nn.Module):
-    def __init__(self, batch_size: int = 16, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super(Generator, self).__init__(*args, **kwargs)
 
         self.input_shape = 100
         self.debug_print_dims: bool = True
-        self.batch_size = batch_size
 
         self.linear1 = nn.Linear(self.input_shape, 7*7*256, bias=False) 
         self.norm1 = nn.BatchNorm1d(7*7*256)
@@ -81,7 +79,7 @@ class Generator(nn.Module):
         x = self.norm1(x)
         x = self.act1(x)
 
-        x = torch.reshape(x, (self.batch_size, 256, 7, 7))
+        x = x.view(-1, 256, 7, 7)
         x = self.conv1(x)
         x = self.norm2(x)
         x = self.act2(x)
@@ -96,34 +94,34 @@ class Generator(nn.Module):
         return x
 
 class Discriminator(nn.Module):
-    def __init__(self, batch_size: int = 16, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        
-        self.batch_size = batch_size
 
         self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2, bias=False)
-        self.act1 = nn.LeakyReLU() 
+        self.act1 = nn.LeakyReLU(0.2, inplace=True) 
         self.drop1 = nn.Dropout(0.3)
 
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, bias=False) 
-        self.act2 = nn.LeakyReLU() 
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, bias=False)
+        self.batch_norm1 = nn.BatchNorm2d(128)
+        self.act2 = nn.LeakyReLU(0.2, inplace=True)
         self.drop2 = nn.Dropout(0.3)
 
         self.flat1 = nn.Flatten()
-        self.linear1 = nn.Linear(self.batch_size*128, 128, bias=False)
-        self.act3 = nn.LeakyReLU()
+        self.linear1 = nn.Linear(2048, 128, bias=False)
+        self.act3 = nn.LeakyReLU(0.2, inplace=True) 
 
-        self.linear2 = nn.Linear(128, 10, bias=False)
-        self.softmax = nn.Softmax(dim=0)       
+        self.linear2 = nn.Linear(128, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x.view(self.batch_size, 1, 28, 28)
+        x = x.view(-1, 1, 28, 28)
 
         x = self.conv1(x)
         x = self.act1(x)
         x = self.drop1(x)
 
         x = self.conv2(x)
+        x = self.batch_norm1(x)
         x = self.act2(x)
         x = self.drop2(x)
        
@@ -132,85 +130,104 @@ class Discriminator(nn.Module):
         x = self.act3(x)
 
         x = self.linear2(x)
-        x = self.softmax(x)
+        x = self.sigmoid(x)
 
         return x
 
-def discriminator_loss(real_output: Tensor, fake_output: Tensor, loss_function) -> Tensor:
-    real_loss = loss_function(torch.ones_like(real_output), real_output)
-    fake_loss = loss_function(torch.zeros_like(fake_output), fake_output)
-    return real_loss + fake_loss
-
-def generator_loss(fake_output: Tensor, loss_function) -> Tensor:
-    return loss_function(torch.ones_like(fake_output), fake_output)
-
-def test_generator(model) -> Tensor:
-    noise = torch.randn((BATCH_SIZE, model.input_shape))
+def test_generator(model, n_samples) -> Tensor:
+    noise = torch.randn((n_samples, model.input_shape), device=device)
     output = model(noise)
-    return output
-
-def test_discriminator(model) -> Tensor:
-    input_image = torch.randn((BATCH_SIZE, 28, 28))
-    output = model(input_image)
     return output
 
 def train(generator, discriminator, n_epochs):
     
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.BCELoss()
 
     generator = generator.to(device)
     discriminator = discriminator.to(device)
 
-    # comment pour testet
-
-    for epoch in tqdm(range(n_epochs)):
-        if not do_train: return -1
-
-        for n, (real_samples, real_labels) in enumerate(train_loader):
+    for epoch in range(n_epochs):
+        for n, (real_samples, _) in enumerate(train_loader):
             
-            noise = torch.randn((BATCH_SIZE, generator.input_shape,)).to(device)
-            real_samples = real_samples.to(device)
-
-            generator_optimizer.zero_grad()
+            ### Training the discriminator
             discriminator_optimizer.zero_grad()
-
+            real_samples = real_samples.to(device)
+            curr_batch_size = real_samples.shape[0]
+            noise = torch.randn((curr_batch_size, generator.input_shape), device=device)
             generated_images = generator(noise)
+            disc_input = torch.cat((real_samples, generated_images))
+            disc_labels = torch.cat((torch.ones((curr_batch_size, 1)), torch.zeros((curr_batch_size, 1)))).to(device)
 
-            real_output = discriminator(real_samples)
-            fake_output = discriminator(generated_images)
-
-            gen_loss = generator_loss(fake_output, loss_function)
-            disc_loss = discriminator_loss(real_output, fake_output, loss_function)
-
-            gen_loss.backward(retain_graph=True)
-            disc_loss.backward()
-
-            generator_optimizer.step()
+            disc_output = discriminator(disc_input)
+            disc_loss = loss_function(disc_output, disc_labels)
+            disc_loss.backward(retain_graph=True)
             discriminator_optimizer.step()
 
-            if n%100 == 0: print(f"batch n° {n}")
+            ### Training the generator
+            generator_optimizer.zero_grad()
+            noise = torch.randn((curr_batch_size, generator.input_shape), device=device)
+            generated_images = generator(noise)
+            
+            disc_output = discriminator(generated_images)
+            gen_loss = loss_function(disc_output, torch.ones((curr_batch_size, 1), device=device))
+            gen_loss.backward()
+            generator_optimizer.step()
+            
+            ### Training the generator again
+            generator_optimizer.zero_grad()
+            noise = torch.randn((curr_batch_size, generator.input_shape), device=device)
+            generated_images = generator(noise)
+            
+            disc_output = discriminator(generated_images)
+            gen_loss = loss_function(disc_output, torch.ones((curr_batch_size, 1), device=device))
+            gen_loss.backward()
+            generator_optimizer.step()
 
-    print("\nDone Training\n")
+            if n%(len(train_loader)//5) == 0: print(f"> [Epoch {epoch+1}] Batch n°{n} ---- | Gen_loss : {gen_loss:.04f} || Disc_loss : {disc_loss:.04f} |")
+        
+        torch.save(generator, "code/models/backup/mnist-gan-generator.pt")
+        torch.save(discriminator, "code/models/backup/mnist-gan-discriminator.pt")
+
+    print("\n### Done Training ###\n")
+    
+    return generator, discriminator
 
 
 if __name__ == "__main__":
 
-    print("Start Training\n")
-
-    generator = Generator()
-    discriminator = Discriminator()
-
-
-    generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0001)
-    discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
-
     do_train = True
-    n_epochs = 5
-    noise_dim = 100
-    num_examples_to_generate = 16
+    use_pretrained = False # warning: is False, pretrained models will be replaced
+    n_epochs = 10
+    
+    if do_train:
+        
+        print("\n### Start Training ###\n")
 
-    seed = torch.manual_seed(50)
+        if use_pretrained:
+            generator = torch.load("code/models/mnist-gan-generator.pt")
+            discriminator = torch.load("code/models/mnist-gan-discriminator.pt")
+        else:
+            generator = Generator()
+            discriminator = Discriminator()
 
-    train(generator, discriminator, n_epochs)
-    # result = test_generator(generator)
-    # result = test_discriminator(discriminator)
+        generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0005)
+        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.00001)
+        
+        generator, discriminator = train(generator, discriminator, n_epochs)
+        torch.save(generator, "code/models/mnist-gan-generator.pt")
+        torch.save(discriminator, "code/models/mnist-gan-discriminator.pt")
+    else:
+        generator = torch.load("code/models/mnist-gan-generator.pt")
+        discriminator = torch.load("code/models/mnist-gan-discriminator.pt")
+    
+    n_samples = 16
+    result = test_generator(generator, n_samples)
+    result = result.cpu()
+    
+    n_plot = int(np.sqrt(n_samples))
+    fig, axes = plt.subplots(n_plot, n_plot)
+    for i in range(n_plot):
+        for j in range(n_plot):
+            ax = axes[i, j]
+            ax.imshow(result[0, 0, :, :].detach().numpy(), cmap='gray')
+    plt.show()
