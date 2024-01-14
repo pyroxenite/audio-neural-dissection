@@ -6,26 +6,10 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt 
 import os
+from os.path import isdir, isfile
 from tqdm import tqdm
 
 Tensor = torch.Tensor
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-BUFFER_SIZE = 30000
-BATCH_SIZE  = 16
-NUM_THREADS = 4
-
-global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
-
-valid_ratio: float = 0.2
-nb_train = int((1.0 - valid_ratio) * len(global_dataset))
-nb_valid = int(valid_ratio * len(global_dataset))
-
-train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_dataset, [nb_train, nb_valid])
-
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
-test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
 
 
 class DebugLayer(nn.Module):
@@ -87,7 +71,7 @@ class Generator(nn.Module):
         x = self.norm1(x)
         x = self.act1(x)
 
-        x = torch.reshape(x, (16, 256, 7, 7))
+        x = torch.reshape(x, (BATCH_SIZE, 256, 7, 7))
         x = self.conv1(x)
         x = self.norm2(x)
         x = self.act2(x)
@@ -119,7 +103,7 @@ class Discriminator(nn.Module):
         self.linear1 = nn.Linear(2048, 128, bias=False)
         self.act3 = nn.LeakyReLU()
 
-        self.linear2 = nn.Linear(128, 10, bias=False)
+        self.linear2 = nn.Linear(128, 1, bias=False)
         self.softmax = nn.Softmax(dim=0)       
 
     def forward(self, x: Tensor) -> Tensor:
@@ -164,17 +148,24 @@ def test_discriminator(model) -> Tensor:
     output = model(input_image)
     return output
 
-def train(generator, discriminator):
+def train(generator: Generator, discriminator: Discriminator, n_epochs: int) -> tuple[Tensor, Tensor]:
     
     loss_function = nn.CrossEntropyLoss()
+
+    gen_loss_array: Tensor = torch.zeros(n_epochs)
+    disc_loss_array: Tensor = torch.zeros(n_epochs)
 
     generator = generator.to(device)
     discriminator = discriminator.to(device)
 
-    # comment pour testet
 
-    for epoch in tqdm(range(nEpochs)):
-        if not do_train: return -1
+    for epoch in range(n_epochs):
+        if not do_train: break
+
+        print(f"epoch : {epoch}/{n_epochs}")
+
+        gen_epoch_loss = 0.0
+        disc_epoch_loss = 0.0
 
         for n, (real_samples, real_labels) in enumerate(train_loader):
             
@@ -198,29 +189,88 @@ def train(generator, discriminator):
             generator_optimizer.step()
             discriminator_optimizer.step()
 
-            if n%100 == 0: print(f"batch n° {n}")
 
-    print("\nDone Training\n")
+            gen_epoch_loss += gen_loss
+            disc_epoch_loss += disc_loss
+        
+        print(f"gen_epoch_loss = {gen_epoch_loss}")
+        print(f"disc_epoch_loss = {disc_epoch_loss}")
+        gen_loss_array[epoch] = gen_epoch_loss
+        disc_loss_array[epoch] = disc_epoch_loss
+
+        if epoch%10 == 0 and save_models:
+
+            torch.save(generator.state_dict(), generator_file)
+            torch.save(discriminator.state_dict(), discriminator_file)
+
+
+    return (gen_loss_array, disc_loss_array)
 
 
 if __name__ == "__main__":
 
-    print("Start Training\n")
+    do_train = True
+    load_models = False
+    save_models = True
 
-    generator = Generator()
-    discriminator = Discriminator()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Computation device : {device}\n")
+
+
+    BUFFER_SIZE = 30000
+    BATCH_SIZE  = 24
+    NUM_THREADS = 4
+
+    global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
+
+    valid_ratio: float = 0.2
+    nb_train = int((1.0 - valid_ratio) * len(global_dataset))
+    nb_valid = int(valid_ratio * len(global_dataset))
+
+
+    train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_dataset, [nb_train, nb_valid])
+
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+    test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+
+
+    generator_file = "code/models/mnist_gan_generator_benjamin.pt"
+    discriminator_file = "code/models/mnist_gan_discriminator_benjamin.pt"
+
+    n_epochs = 10
+    print(f"n_epochs = {n_epochs}")
+
+    noise_dim = 100
+    num_examples_to_generate = 16
+
+    generator = None
+    discriminator = None
+
+    if (load_models and isfile(generator_file) 
+                    and isfile(discriminator_file)):
+
+        generator = torch.load(generator_file)
+        discriminator = torch.load(discriminator_file)
+
+    else:
+        generator = Generator()
+        discriminator = Discriminator()
 
 
     generator_optimizer = torch.optim.Adam(generator.parameters(), 0.0001)
     discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 0.0001)
 
-    do_train = True
-    nEpochs = 5
-    noise_dim = 100
-    num_examples_to_generate = 16
-
     seed = torch.manual_seed(50)
 
-    train(generator, discriminator)
+    print("Start Training\n")
+    gen_loss, disc_loss = train(generator, discriminator, n_epochs)
     # result = test_generator(generator)
     # result = test_discriminator(discriminator)
+    print("\nDone Training\n")
+
+    torch.save(generator.state_dict(), generator_file)
+    torch.save(discriminator.state_dict(), discriminator_file)
+
+    fig, ax = plt.subplots()
+    ax.plot(gen_loss)
+    ax.plt(disc_loss)
