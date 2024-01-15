@@ -73,13 +73,10 @@ class Discriminator(nn.Module):
 
             nn.Flatten(),
             nn.Linear(2048, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
-            # nn.Linear(2048, 128, bias=False),
             # nn.BatchNorm1d(128),
             # nn.LeakyReLU(0.2, inplace=True),
 
             # nn.Linear(128, 1, bias=False),
-            
             nn.Sigmoid(),
         )
 
@@ -146,9 +143,9 @@ def train(generator, discriminator, n_epochs):
 
 if __name__ == "__main__":
 
-    do_train = True
+    do_train = False
     use_pretrained = True # warning: if False, pretrained models will be replaced
-    n_epochs = 50
+    n_epochs = 5
     
     if do_train:
         
