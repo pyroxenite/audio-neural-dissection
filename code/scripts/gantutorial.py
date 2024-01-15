@@ -177,8 +177,8 @@ def train(generator: Generator, discriminator: Discriminator, n_epochs: int) -> 
             noise = torch.randn((BATCH_SIZE, generator.input_shape,)).to(device)
             real_samples = real_samples.to(device)
 
-            generator_optimizer.zero_grad()
-            discriminator_optimizer.zero_grad()
+            generator.zero_grad()
+            discriminator.zero_grad()
 
             generated_images = generator(noise)
 
