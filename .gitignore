@@ -19,6 +19,9 @@ profile_default/
 # Local dataset storage
 /code/data/
 
+# Local model storage
+/code/models/
+
 # Local package installs
 /venv/
 
