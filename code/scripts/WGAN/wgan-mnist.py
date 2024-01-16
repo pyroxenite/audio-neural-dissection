@@ -26,27 +26,31 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         
         self.input_shape = input_shape
+        self.hidden_dim = hidden_dim
         
-        self.main = nn.Sequential(
-            nn.ConvTranspose2d(input_shape, 4*hidden_dim, kernel_size=3, stride=2, bias=False),
-            nn.BatchNorm2d(4*hidden_dim),
-            nn.ReLU(inplace=True),
-            
-            nn.ConvTranspose2d(4*hidden_dim, 2*hidden_dim, kernel_size=4, stride=1, bias=False),
+        self.lin_seq = nn.Sequential(
+            nn.Linear(self.input_shape, 7*7*4*hidden_dim, bias=False),
+            nn.BatchNorm1d(7*7*4*hidden_dim),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+        
+        self.conv_seq = nn.Sequential(            
+            nn.ConvTranspose2d(4*hidden_dim, 2*hidden_dim, kernel_size=5, stride=1, padding=2, bias=False),
             nn.BatchNorm2d(2*hidden_dim),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             
-            nn.ConvTranspose2d(2*hidden_dim, hidden_dim, kernel_size=3, stride=2, bias=False),
+            nn.ConvTranspose2d(2*hidden_dim, hidden_dim, kernel_size=5, stride=2, padding=2, output_padding=1, bias=False),
             nn.BatchNorm2d(hidden_dim),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             
-            nn.ConvTranspose2d(hidden_dim, output_dim, kernel_size=4, stride=2, bias=False),
+            nn.ConvTranspose2d(hidden_dim, output_dim, kernel_size=5, stride=2, padding=2, output_padding=1, bias=False),
             nn.Tanh(),
         )
         
     def forward(self, x):
-        x = x.view(len(x), self.input_shape, 1, 1)
-        x = self.main(x)
+        x = self.lin_seq(x)
+        x = x.view(-1, 4*self.hidden_dim, 7, 7)
+        x = self.conv_seq(x)
         return x
 
 class Discriminator(nn.Module):
@@ -54,28 +58,25 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         
         self.main = nn.Sequential(
-            nn.Conv2d(input_dim, 4*hidden_dim, kernel_size=4, stride=2, bias=False),
+            nn.Conv2d(input_dim, 4*hidden_dim, kernel_size=5, stride=2, bias=False),
             nn.BatchNorm2d(4*hidden_dim),
             nn.LeakyReLU(0.2, inplace=True),
-            # nn.Dropout(0.3),
+            nn.Dropout(0.3),
 
-            nn.Conv2d(4*hidden_dim, 8*hidden_dim, kernel_size=4, stride=2, bias=False),
+            nn.Conv2d(4*hidden_dim, 8*hidden_dim, kernel_size=5, stride=2, bias=False),
             nn.BatchNorm2d(8*hidden_dim),
             nn.LeakyReLU(0.2, inplace=True),
-            # nn.Dropout(0.3),
+            nn.Dropout(0.3),
 
-            # nn.Flatten(),
-            # nn.Linear(2048, 1, bias=False),
+            nn.Flatten(),
+            nn.Linear(8*hidden_dim*hidden_dim, 1, bias=False),
             # nn.BatchNorm1d(128),
-            # nn.LeakyReLU(0.2, inplace=True),
-            
-            nn.Conv2d(8*hidden_dim, 1, kernel_size=4, stride=2, bias=False),
             # nn.Linear(128, 1, bias=False),
-            
             nn.Sigmoid(),
         )
 
     def forward(self, x):
+        x = x.view(-1, 1, 28, 28)
         x = self.main(x)
         return x
 
@@ -112,7 +113,7 @@ def get_gradient(discriminator, real_samples, fake_samples, eps):
 
 def train(generator, discriminator, n_epochs, z_dim):
     
-    # loss_function = nn.BCELoss()
+    loss_function = nn.BCELoss()
     c_lambda = 10
     n_train_disc = 5
 
@@ -171,9 +172,9 @@ def train(generator, discriminator, n_epochs, z_dim):
 
 if __name__ == "__main__":
 
-    do_train = False
+    do_train = True
     use_pretrained = True # warning: if False, pretrained models will be replaced
-    n_epochs = 20
+    n_epochs = 10
     lr = 1e-4
     
     z_dim = 100
