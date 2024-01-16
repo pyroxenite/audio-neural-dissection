@@ -134,8 +134,8 @@ def train(generator, discriminator, n_epochs):
             if n%n_print == 0:
                 print(f"> [Epoch {epoch+1}] Batch n°{n} ---- | D(x) : {disc_x:.04f} || D(G(z))_1 : {d_g_z_1:.04f} || D(G(z))_2 : {d_g_z_2:.04f} |")
         
-        torch.save(generator, "code/models/MNIST/backup/mnist-gan-generator.pt")
-        torch.save(discriminator, "code/models/MNIST/backup/mnist-gan-discriminator.pt")
+        torch.save(generator, "code/models/DCGAN/backup/mnist-gan-generator.pt")
+        torch.save(discriminator, "code/models/DCGAN/backup/mnist-gan-discriminator.pt")
 
     print("\n### Done Training ###\n")
     
@@ -152,21 +152,21 @@ if __name__ == "__main__":
         print("\n### Start Training ###\n")
 
         if use_pretrained:
-            generator = torch.load("code/models/MNIST/mnist-gan-generator.pt")
-            discriminator = torch.load("code/models/MNIST/mnist-gan-discriminator.pt")
+            generator = torch.load("code/models/DCGAN/mnist-gan-generator.pt")
+            discriminator = torch.load("code/models/DCGAN/mnist-gan-discriminator.pt")
         else:
             generator = Generator()
             discriminator = Discriminator()
 
-        generator_optimizer = torch.optim.Adam(generator.parameters(), 1e-3)
-        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 1e-3)
+        generator_optimizer = torch.optim.Adam(generator.parameters(), 1e-4)
+        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 1e-4)
         
         generator, discriminator = train(generator, discriminator, n_epochs)
-        torch.save(generator, "code/models/MNIST/mnist-gan-generator.pt")
-        torch.save(discriminator, "code/models/MNIST/mnist-gan-discriminator.pt")
+        torch.save(generator, "code/models/DCGAN/mnist-gan-generator.pt")
+        torch.save(discriminator, "code/models/DCGAN/mnist-gan-discriminator.pt")
     else:
-        generator = torch.load("code/models/MNIST/mnist-gan-generator.pt")
-        discriminator = torch.load("code/models/MNIST/mnist-gan-discriminator.pt")
+        generator = torch.load("code/models/DCGAN/mnist-gan-generator.pt")
+        discriminator = torch.load("code/models/DCGAN/mnist-gan-discriminator.pt")
     
     n_samples = 16
     result = test_generator(generator, n_samples)
