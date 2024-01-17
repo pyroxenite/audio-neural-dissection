@@ -265,9 +265,9 @@ if __name__ == "__main__":
     seed = torch.manual_seed(50)
 
     print("Start Training\n")
-    gen_loss, disc_loss = train(generator, discriminator, n_epochs)
+    # gen_loss, disc_loss = train(generator, discriminator, n_epochs)
     # result = test_generator(generator)
-    # result = test_discriminator(discriminator)
+    result = test_discriminator(discriminator)
     print("\nDone Training\n")
 
     torch.save(generator.state_dict(), generator_file)
