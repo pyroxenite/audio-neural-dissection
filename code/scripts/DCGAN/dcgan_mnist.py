@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 from torchvision.datasets import MNIST
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose, Normalize
 import matplotlib.pyplot as plt 
 import numpy as np
 
@@ -15,7 +15,11 @@ BUFFER_SIZE = 30000
 BATCH_SIZE  = 256
 NUM_THREADS = 4
 
-global_dataset = MNIST(root="./code/data", train=True, transform=ToTensor(), download=True)
+# Normalizing images to [-1, 1] since the output of the generator is in [-1, 1] (tanh)
+transform = Compose([ToTensor(), Normalize((0.5,), (0.5,))])
+
+# Loading the MNIST dataset
+global_dataset = MNIST(root="./code/data", train=True, transform=transform, download=True)
 
 valid_ratio: float = 0.2
 nb_train = int((1.0 - valid_ratio) * len(global_dataset))
@@ -143,9 +147,9 @@ def train(generator, discriminator, n_epochs):
 
 if __name__ == "__main__":
 
-    do_train = False
+    do_train = True
     use_pretrained = True # warning: if False, pretrained models will be replaced
-    n_epochs = 5
+    n_epochs = 50
     
     if do_train:
         
