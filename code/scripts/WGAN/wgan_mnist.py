@@ -177,7 +177,7 @@ def train(generator, discriminator, n_epochs, z_dim):
 if __name__ == "__main__":
 
     do_train = True
-    use_pretrained = False # warning: if False, pretrained models will be replaced
+    use_pretrained = True # warning: if False, pretrained models will be replaced
     n_epochs = 50
     lr = 1e-4
     
