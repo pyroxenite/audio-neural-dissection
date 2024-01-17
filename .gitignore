@@ -21,6 +21,7 @@ profile_default/
 
 # Local model storage
 /code/models/
+.gz
 
 # Local package installs
 /venv/
