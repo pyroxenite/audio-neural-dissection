@@ -74,8 +74,6 @@ class Discriminator(nn.Module):
 
             nn.Flatten(),
             nn.Linear(8*hidden_dim*hidden_dim, 1, bias=False),
-            # nn.BatchNorm1d(128),
-            # nn.Linear(128, 1, bias=False),
             nn.Sigmoid(),
         )
 

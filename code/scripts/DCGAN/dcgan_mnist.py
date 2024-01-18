@@ -11,24 +11,27 @@ Tensor = torch.Tensor
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-BUFFER_SIZE = 30000
-BATCH_SIZE  = 256
-NUM_THREADS = 4
+def load_mnist():
+    BUFFER_SIZE = 30000
+    BATCH_SIZE  = 256
+    NUM_THREADS = 4
 
-# Normalizing images to [-1, 1] since the output of the generator is in [-1, 1] (tanh)
-transform = Compose([ToTensor(), Normalize((0.5,), (0.5,))])
+    # Normalizing images to [-1, 1] since the output of the generator is in [-1, 1] (tanh)
+    transform = Compose([ToTensor(), Normalize((0.5,), (0.5,))])
 
-# Loading the MNIST dataset
-global_dataset = MNIST(root="./code/data", train=True, transform=transform, download=True)
+    # Loading the MNIST dataset
+    global_dataset = MNIST(root="./code/data", train=True, transform=transform, download=True)
 
-valid_ratio: float = 0.2
-nb_train = int((1.0 - valid_ratio) * len(global_dataset))
-nb_valid = int(valid_ratio * len(global_dataset))
+    valid_ratio: float = 0.2
+    nb_train = int((1.0 - valid_ratio) * len(global_dataset))
+    nb_valid = int(valid_ratio * len(global_dataset))
 
-train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_dataset, [nb_train, nb_valid])
+    train_dataset, test_dataset = torch.utils.data.dataset.random_split(global_dataset, [nb_train, nb_valid])
 
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
-test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+    test_loader  = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_THREADS)
+    
+    return train_loader, test_loader
 
 class Generator(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
@@ -77,10 +80,6 @@ class Discriminator(nn.Module):
 
             nn.Flatten(),
             nn.Linear(2048, 1, bias=False),
-            # nn.BatchNorm1d(128),
-            # nn.LeakyReLU(0.2, inplace=True),
-
-            # nn.Linear(128, 1, bias=False),
             nn.Sigmoid(),
         )
 
@@ -94,7 +93,7 @@ def test_generator(model, n_samples) -> Tensor:
     output = model(noise)
     return output
 
-def train(generator, discriminator, n_epochs):
+def train(generator, discriminator, n_epochs, train_loader):
     
     loss_function = nn.BCELoss()
 
@@ -147,7 +146,7 @@ def train(generator, discriminator, n_epochs):
 
 if __name__ == "__main__":
 
-    do_train = True
+    do_train = False
     use_pretrained = True # warning: if False, pretrained models will be replaced
     n_epochs = 50
     
@@ -155,6 +154,8 @@ if __name__ == "__main__":
         
         print("\n### Start Training ###\n")
 
+        train_loader, _ = load_mnist()
+        
         if use_pretrained:
             generator = torch.load("code/models/DCGAN/mnist-gan-generator.pt")
             discriminator = torch.load("code/models/DCGAN/mnist-gan-discriminator.pt")
@@ -165,7 +166,7 @@ if __name__ == "__main__":
         generator_optimizer = torch.optim.Adam(generator.parameters(), 1e-4)
         discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), 1e-4)
         
-        generator, discriminator = train(generator, discriminator, n_epochs)
+        generator, discriminator = train(generator, discriminator, n_epochs, train_loader)
         torch.save(generator, "code/models/DCGAN/mnist-gan-generator.pt")
         torch.save(discriminator, "code/models/DCGAN/mnist-gan-discriminator.pt")
     else:
