@@ -97,7 +97,7 @@ class GoogleNetActivationMaximizer():
         
         if plot_inline or save:
             plt.imshow(np.moveaxis(im, 0, -1))
-            plt.title(f"Iteration: {i}")
+            plt.title(f"Iteration: {i+1}")
             
             if save:
                 if not os.path.isdir("output"):
@@ -144,7 +144,7 @@ class GoogleNetActivationMaximizer():
                 self.input.data = _normalize(self.input.data)
 
                 # Plotting
-                if plot_period != None and ((i % plot_period == 0) or i == iterations-1):
+                if plot_period != None and ((i % plot_period == plot_period-1) or i == 0):
                     self.plot_input(i, plot_period, save=save, plot_inline=plot_inline)
 
                 # External transforms
