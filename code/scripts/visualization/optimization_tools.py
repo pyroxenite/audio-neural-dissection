@@ -97,7 +97,7 @@ class GoogleNetActivationMaximizer():
         
         if plot_inline or save:
             plt.imshow(np.moveaxis(im, 0, -1))
-            plt.title(f"Iteration: {i+1}")
+            plt.title(f"Iteration: {i}")
             
             if save:
                 if not os.path.isdir("output"):
