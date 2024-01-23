@@ -10,9 +10,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
 
-    do_train = False
+    do_train = True
     use_pretrained = True # warning: if False, pretrained models will be replaced
-    n_epochs = 50
+    n_epochs = 25
     lr = 1e-4
     
     z_dim = 100
